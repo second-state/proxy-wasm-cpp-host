@@ -24,6 +24,12 @@ def proxy_wasm_select_runtime_wamr(xs):
         "//conditions:default": [],
     })
 
+def proxy_wasm_select_runtime_wasmedge(xs):
+    return select({
+        "@proxy_wasm_cpp_host//bazel:runtime_wasmedge": xs,
+        "//conditions:default": [],
+    })
+
 def proxy_wasm_select_runtime_wasmtime(xs):
     return select({
         "@proxy_wasm_cpp_host//bazel:runtime_wasmtime": xs,

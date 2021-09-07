@@ -79,6 +79,9 @@ jobs:
         - name: 'WAMR on macOS'
           runtime: 'wamr'
           os: macos-11
+        - name: 'WasmEdge on Linux'
+          runtime: 'wasmedge'
+          os: ubuntu-20.04
         - name: 'Wasmtime on Linux'
           runtime: 'wasmtime'
           os: ubuntu-20.04

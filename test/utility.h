@@ -32,6 +32,9 @@
 #if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
 #include "include/proxy-wasm/wasmtime.h"
 #endif
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMEDGE)
+#include "include/proxy-wasm/wasmedge.h"
+#endif
 #if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
 #include "include/proxy-wasm/wamr.h"
 #endif
@@ -87,6 +90,10 @@ public:
 #if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
     } else if (runtime_ == "wasmtime") {
       vm = proxy_wasm::createWasmtimeVm();
+#endif
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMEDGE)
+    } else if (runtime_ == "wasmedge") {
+      vm = proxy_wasm::createWasmEdgeVm();
 #endif
 #if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
     } else if (runtime_ == "wamr") {

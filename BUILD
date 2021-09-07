@@ -3,6 +3,7 @@ load(
     "@proxy_wasm_cpp_host//bazel:select.bzl",
     "proxy_wasm_select_runtime_v8",
     "proxy_wasm_select_runtime_wamr",
+    "proxy_wasm_select_runtime_wasmedge",
     "proxy_wasm_select_runtime_wasmtime",
     "proxy_wasm_select_runtime_wavm",
 )
@@ -119,6 +120,25 @@ cc_library(
 )
 
 cc_library(
+    name = "wasmedge_lib",
+    srcs = [
+        "src/common/types.h",
+        "src/wasmedge/types.h",
+        "src/wasmedge/wasmedge.cc",
+    ],
+    hdrs = ["include/proxy-wasm/wasmedge.h"],
+    defines = ["PROXY_WASM_HAS_RUNTIME_WASMEDGE"],
+    linkopts = [
+        "-lrt",
+        "-ldl",
+    ],
+    deps = [
+        ":wasm_vm_headers",
+        "//external:wasmedge",
+    ],
+)
+
+cc_library(
     name = "wasmtime_lib",
     srcs = [
         "src/common/types.h",
@@ -160,6 +180,8 @@ cc_library(
         [":v8_lib"],
     ) + proxy_wasm_select_runtime_wamr(
         [":wamr_lib"],
+    ) + proxy_wasm_select_runtime_wasmedge(
+        [":wasmedge_lib"],
     ) + proxy_wasm_select_runtime_wasmtime(
         [":wasmtime_lib"],
     ) + proxy_wasm_select_runtime_wavm(

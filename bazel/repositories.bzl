@@ -184,3 +184,16 @@ def proxy_wasm_cpp_host_repositories():
         ],
         sha256 = "c6966ec828da198c5d9adbaa94c05e3a1c7f21bd012a0b29ba8ddbccb2c93b0d",
     )
+
+    http_archive(
+        name = "com_github_wasmedge_wasmedge",
+        build_file = "@proxy_wasm_cpp_host//bazel/external:wasmedge.BUILD",
+        sha256 = "48c15893f036b86b0f28d96e6269a4ac75d9697a30c44b171e254c83409afb30",
+        strip_prefix = "WasmEdge-0.8.2-Linux",
+        url = "https://github.com/WasmEdge/WasmEdge/releases/download/0.8.2/WasmEdge-0.8.2-manylinux2014_x86_64.tar.gz",
+    )
+
+    native.bind(
+        name = "wasmedge",
+        actual = "@com_github_wasmedge_wasmedge//:wasmedge_lib",
+    )

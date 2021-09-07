@@ -27,6 +27,9 @@ std::vector<std::string> getRuntimes() {
 #if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
     "wasmtime",
 #endif
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMEDGE)
+    "wasmedge",
+#endif
 #if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
     "wamr",
 #endif

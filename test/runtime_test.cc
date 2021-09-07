@@ -34,7 +34,7 @@ auto test_values = testing::ValuesIn(getRuntimes());
 INSTANTIATE_TEST_SUITE_P(Runtimes, TestVM, test_values);
 
 TEST_P(TestVM, Basic) {
-  if (runtime_ == "wamr") {
+  if (runtime_ == "wamr" || runtime_ == "wasmedge") {
     EXPECT_EQ(vm_->cloneable(), proxy_wasm::Cloneable::NotCloneable);
   } else if (runtime_ == "wasmtime" || runtime_ == "v8") {
     EXPECT_EQ(vm_->cloneable(), proxy_wasm::Cloneable::CompiledBytecode);

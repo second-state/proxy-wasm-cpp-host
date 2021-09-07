@@ -11,6 +11,11 @@ config_setting(
 )
 
 config_setting(
+    name = "runtime_wasmedge",
+    values = {"define": "runtime=wasmedge"},
+)
+
+config_setting(
     name = "runtime_wasmtime",
     values = {"define": "runtime=wasmtime"},
 )
