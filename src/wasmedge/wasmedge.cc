@@ -17,7 +17,7 @@
 #include "include/proxy-wasm/wasm_vm.h"
 #include "src/wasmedge/types.h"
 
-#include "wasmedge.h"
+#include "wasmedge/wasmedge.h"
 
 #include <array>
 #include <cassert>
@@ -206,11 +206,10 @@ namespace WasmEdge {
 struct HostFuncData {
   HostFuncData(const std::string_view modname, const std::string_view name)
       : modname_(modname), name_(name) {}
-  ~HostFuncData() { WasmEdge_FunctionTypeDelete(functype_); }
+  ~HostFuncData() {}
 
   std::string modname_, name_;
-  WasmEdge_WrapFunc_t callback_;
-  WasmEdge_FunctionTypeContext *functype_;
+  WasmEdge_HostFunc_t callback_;
   void *raw_func_;
   WasmVm *vm_;
 };
@@ -219,8 +218,7 @@ using HostFuncDataPtr = std::unique_ptr<HostFuncData>;
 
 struct HostModuleData {
   HostModuleData(const std::string_view modname) {
-    cxt_ =
-        WasmEdge_ImportObjectCreate(WasmEdge_StringWrap(modname.data(), modname.length()), nullptr);
+    cxt_ = WasmEdge_ImportObjectCreate(WasmEdge_StringWrap(modname.data(), modname.length()));
   }
   ~HostModuleData() { WasmEdge_ImportObjectDelete(cxt_); }
 
@@ -234,7 +232,7 @@ public:
   WasmEdge() {
     loader_ = WasmEdge_LoaderCreate(nullptr);
     validator_ = WasmEdge_ValidatorCreate(nullptr);
-    interpreter_ = WasmEdge_InterpreterCreate(nullptr, nullptr);
+    executor_ = WasmEdge_ExecutorCreate(nullptr, nullptr);
     store_ = nullptr;
     module_ = nullptr;
     memory_ = nullptr;
@@ -289,7 +287,7 @@ private:
 
   WasmEdgeLoaderPtr loader_;
   WasmEdgeValidatorPtr validator_;
-  WasmEdgeInterpreterPtr interpreter_;
+  WasmEdgeExecutorPtr executor_;
   WasmEdgeStorePtr store_;
   WasmEdgeASTModulePtr module_;
   WasmEdge_MemoryInstanceContext *memory_;
@@ -319,8 +317,7 @@ bool WasmEdge::link(std::string_view debug_name) {
   // Create store and register imports.
   store_ = WasmEdge_StoreCreate();
   for (auto &&it : import_objects_) {
-    auto res =
-        WasmEdge_InterpreterRegisterImport(interpreter_.get(), store_.get(), it.second->cxt_);
+    auto res = WasmEdge_ExecutorRegisterImport(executor_.get(), store_.get(), it.second->cxt_);
     if (!WasmEdge_ResultOK(res)) {
       fail(FailState::UnableToInitializeCode,
            std::string("Failed to link Wasm module due to import: ") + it.first);
@@ -328,7 +325,7 @@ bool WasmEdge::link(std::string_view debug_name) {
     }
   }
   // Instantiate module.
-  if (auto res = WasmEdge_InterpreterInstantiate(interpreter_.get(), store_.get(), module_.get());
+  if (auto res = WasmEdge_ExecutorInstantiate(executor_.get(), store_.get(), module_.get());
       !WasmEdge_ResultOK(res)) {
     fail(FailState::UnableToInitializeCode,
          std::string("Failed to link Wasm module: ") + std::string(WasmEdge_ResultGetMessage(res)));
@@ -345,7 +342,6 @@ bool WasmEdge::link(std::string_view debug_name) {
     WasmEdge_StoreListFunction(store_.get(), &names[0], num);
     for (auto i = 0; i < num; i++) {
       module_functions_.insert(std::string(names[i].Buf, names[i].Length));
-      WasmEdge_StringDelete(names[i]);
     }
   }
   return true;
@@ -402,13 +398,12 @@ void WasmEdge::registerHostFunctionImpl(std::string_view module_name,
   }
 
   auto data = std::make_unique<HostFuncData>(module_name, function_name);
+  auto *func_type = newWasmEdgeFuncType<std::tuple<Args...>>();
   data->vm_ = this;
-  data->functype_ = newWasmEdgeFuncType<std::tuple<Args...>>();
   data->raw_func_ = reinterpret_cast<void *>(function);
-  data->callback_ = [](void *func, void *data, WasmEdge_MemoryInstanceContext *MemCxt,
-                       const WasmEdge_Value *Params, const uint32_t ParamLen,
-                       WasmEdge_Value *Returns, const uint32_t ReturnLen) -> WasmEdge_Result {
-    auto func_data = reinterpret_cast<HostFuncData *>(func);
+  data->callback_ = [](void *data, WasmEdge_MemoryInstanceContext *MemCxt,
+                       const WasmEdge_Value *Params, WasmEdge_Value *Returns) -> WasmEdge_Result {
+    auto func_data = reinterpret_cast<HostFuncData *>(data);
     const bool log = func_data->vm_->cmpLogLevel(LogLevel::trace);
     if (log) {
       func_data->vm_->integration()->trace("[vm->host] " + func_data->modname_ + "." +
@@ -425,10 +420,10 @@ void WasmEdge::registerHostFunctionImpl(std::string_view module_name,
     return WasmEdge_Result_Success;
   };
 
-  auto *hostfunc_cxt =
-      WasmEdge_HostFunctionCreateBinding(data->functype_, data->callback_, data.get(), 0);
+  auto *hostfunc_cxt = WasmEdge_FunctionInstanceCreate(func_type, data->callback_, data.get(), 0);
+  WasmEdge_FunctionTypeDelete(func_type);
 
-  WasmEdge_ImportObjectAddHostFunction(
+  WasmEdge_ImportObjectAddFunction(
       it->second->cxt_, WasmEdge_StringWrap(function_name.data(), function_name.length()),
       hostfunc_cxt);
   host_functions_.insert_or_assign(std::string(module_name) + "." + std::string(function_name),
@@ -445,13 +440,12 @@ void WasmEdge::registerHostFunctionImpl(std::string_view module_name,
   }
 
   auto data = std::make_unique<HostFuncData>(module_name, function_name);
+  auto *func_type = newWasmEdgeFuncType<R, std::tuple<Args...>>();
   data->vm_ = this;
-  data->functype_ = newWasmEdgeFuncType<R, std::tuple<Args...>>();
   data->raw_func_ = reinterpret_cast<void *>(function);
-  data->callback_ = [](void *func, void *data, WasmEdge_MemoryInstanceContext *MemCxt,
-                       const WasmEdge_Value *Params, const uint32_t ParamLen,
-                       WasmEdge_Value *Returns, const uint32_t ReturnLen) -> WasmEdge_Result {
-    auto func_data = reinterpret_cast<HostFuncData *>(func);
+  data->callback_ = [](void *data, WasmEdge_MemoryInstanceContext *MemCxt,
+                       const WasmEdge_Value *Params, WasmEdge_Value *Returns) -> WasmEdge_Result {
+    auto func_data = reinterpret_cast<HostFuncData *>(data);
     const bool log = func_data->vm_->cmpLogLevel(LogLevel::trace);
     if (log) {
       func_data->vm_->integration()->trace("[vm->host] " + func_data->modname_ + "." +
@@ -469,10 +463,10 @@ void WasmEdge::registerHostFunctionImpl(std::string_view module_name,
     return WasmEdge_Result_Success;
   };
 
-  auto *hostfunc_cxt =
-      WasmEdge_HostFunctionCreateBinding(data->functype_, data->callback_, data.get(), 0);
+  auto *hostfunc_cxt = WasmEdge_FunctionInstanceCreate(func_type, data->callback_, data.get(), 0);
+  WasmEdge_FunctionTypeDelete(func_type);
 
-  WasmEdge_ImportObjectAddHostFunction(
+  WasmEdge_ImportObjectAddFunction(
       it->second->cxt_, WasmEdge_StringWrap(function_name.data(), function_name.length()),
       hostfunc_cxt);
   host_functions_.insert_or_assign(std::string(module_name) + "." + std::string(function_name),
@@ -518,10 +512,10 @@ void WasmEdge::getModuleFunctionImpl(std::string_view function_name,
                            printValues(params, sizeof...(Args)) + ")");
     }
     SaveRestoreContext saved_context(context);
-    WasmEdge_Result res = WasmEdge_InterpreterInvoke(
-        interpreter_.get(), store_.get(),
-        WasmEdge_StringWrap(function_name.data(), function_name.length()), params, sizeof...(Args),
-        nullptr, 0);
+    WasmEdge_Result res =
+        WasmEdge_ExecutorInvoke(executor_.get(), store_.get(),
+                                WasmEdge_StringWrap(function_name.data(), function_name.length()),
+                                params, sizeof...(Args), nullptr, 0);
     if (!WasmEdge_ResultOK(res)) {
       fail(FailState::RuntimeError, "Function: " + std::string(function_name) + " failed:\n" +
                                         WasmEdge_ResultGetMessage(res));
@@ -573,10 +567,10 @@ void WasmEdge::getModuleFunctionImpl(std::string_view function_name,
                            printValues(params, sizeof...(Args)) + ")");
     }
     SaveRestoreContext saved_context(context);
-    WasmEdge_Result res = WasmEdge_InterpreterInvoke(
-        interpreter_.get(), store_.get(),
-        WasmEdge_StringWrap(function_name.data(), function_name.length()), params, sizeof...(Args),
-        results, 1);
+    WasmEdge_Result res =
+        WasmEdge_ExecutorInvoke(executor_.get(), store_.get(),
+                                WasmEdge_StringWrap(function_name.data(), function_name.length()),
+                                params, sizeof...(Args), results, 1);
     if (!WasmEdge_ResultOK(res)) {
       fail(FailState::RuntimeError, "Function: " + std::string(function_name) + " failed:\n" +
                                         WasmEdge_ResultGetMessage(res));

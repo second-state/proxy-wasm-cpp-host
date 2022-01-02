@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "src/common/types.h"
-#include "wasmedge.h"
+#include "wasmedge/wasmedge.h"
 
 namespace proxy_wasm {
 namespace WasmEdge {
@@ -22,8 +22,7 @@ using WasmEdgeStorePtr = common::CSmartPtr<WasmEdge_StoreContext, WasmEdge_Store
 using WasmEdgeVMPtr = common::CSmartPtr<WasmEdge_VMContext, WasmEdge_VMDelete>;
 using WasmEdgeLoaderPtr = common::CSmartPtr<WasmEdge_LoaderContext, WasmEdge_LoaderDelete>;
 using WasmEdgeValidatorPtr = common::CSmartPtr<WasmEdge_ValidatorContext, WasmEdge_ValidatorDelete>;
-using WasmEdgeInterpreterPtr =
-    common::CSmartPtr<WasmEdge_InterpreterContext, WasmEdge_InterpreterDelete>;
+using WasmEdgeExecutorPtr = common::CSmartPtr<WasmEdge_ExecutorContext, WasmEdge_ExecutorDelete>;
 using WasmEdgeASTModulePtr = common::CSmartPtr<WasmEdge_ASTModuleContext, WasmEdge_ASTModuleDelete>;
 
 } // namespace WasmEdge
